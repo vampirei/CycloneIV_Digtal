@@ -1,0 +1,284 @@
+module Digtal_Main(
+	input 			CLOCK_Digtal,		//数字接口时钟
+	//编码器相关
+	input 			CS,					//片选
+	output [7:0]	Out_Data,			//数据输出
+	//数据接收相关
+	input 			RD,					//接收模块数据输出时钟
+	input [7:0]		Rx_Data,				//接收模块数据输出
+	//RAM相关
+	output [7:0]	RAM_Data_In,		//RAM数据输入
+	output [30:0]	RAM_RDADD,			//RAM读取地址
+	output [30:0]	RAM_WRADD,			//RAM写入地址
+	output 			RAM_RDEN,			//RAM读请求
+	output 			RAM_WREN,			//RAM写请求
+	input [7:0]		RAM_Q					//RAM数据输出
+	);
+//------------参数定义
+	parameter unsigned integer Mode = 1;										//工作模式：1--接收到即发送，插入字有效；其他--整帧接收模式，帧头字有效。
+	parameter unsigned integer Length_InsertOrFrameheader = 4;			//插入字或帧头长度
+	parameter 						Byte1_InsertOrFrameheader = 8'HEB;		//插入字1或者帧头1
+	parameter 						Byte2_InsertOrFrameheader = 8'H90;		//插入字2或者帧头2
+	parameter 						Byte3_InsertOrFrameheader = 8'H90;		//插入字3或者帧头3
+	parameter 						Byte4_InsertOrFrameheader = 8'HEB;		//插入字4或者帧头4
+	parameter 						Byte5_InsertOrFrameheader = 8'HEB;		//插入字5或者帧头5
+	parameter 						Byte6_InsertOrFrameheader = 8'H90;		//插入字6或者帧头6
+	parameter 						Byte7_InsertOrFrameheader = 8'H90;		//插入字7或者帧头7
+	parameter 						Byte8_InsertOrFrameheader = 8'HEB;		//插入字8或者帧头8
+/*	parameter Instert_Length = 4;						//插入字长度，4---8
+	parameter Instert_Byte1 = 8'HEB;					//插入字1
+	parameter Instert_Byte2 = 8'H90;					//插入字2
+	parameter Instert_Byte3 = 8'H90;					//插入字3
+	parameter Instert_Byte4 = 8'HEB;					//插入字4
+	parameter Instert_Byte5 = 8'HEB;					//插入字5
+	parameter Instert_Byte6 = 8'H90;					//插入字6
+	parameter Instert_Byte7 = 8'H90;					//插入字7
+	parameter Instert_Byte8 = 8'HEB;					//插入字8
+*/	
+	localparam Write_Delay = 15;						//读写定时阈值
+	
+//------------内部声明
+	reg [1:0] 	Digtal_CS_Edge = 2'B00;					//CS边沿寄存器
+	reg [1:0] 	Digtal_DATA_RD_Edge = 2'B00;			//RD边沿寄存器
+	reg 			CLK_Counter_W_EN  = 1'B0;				//时钟计数允许(写RAM)						
+	reg [7:0]	CLK_Counter_W = 8'D0;					//时钟计数(写RAM)
+	reg 			CLK_Counter_R_EN  = 1'B0;				//时钟计数允许(读RAM)
+	reg [7:0] 	CLK_Counter_R = 8'D0;					//时钟计数(读RAM)
+	reg [31:0] 	RAM_wraddress_Reg = 32'D0;				//RAM写入地址寄存器
+	reg [31:0] 	RAM_rdaddress_Reg = 32'D0;				//RAM读取地址寄存器
+	reg [9:0] 	SenddStatus = 10'B10_0000_0001;		//发送状态
+																	/*
+																	bit0 ----- bit7 Insert word 发送情况
+																	bit8   Read状态
+																	bit9   Insert状态		
+																	*/	
+	reg [7:0] 	OUTPUT_data_Reg = 8'D0;					//输出数据缓存
+	reg 			RAM_rden_Reg = 1'B0;						//RAM读请求缓存
+	reg 			RAM_wren_Reg = 1'B0;						//RAM写请求缓存
+	
+//*****************片选边沿获取	
+	always @(posedge CLOCK_Digtal)	begin
+		Digtal_CS_Edge[1] = Digtal_CS_Edge[0];
+		Digtal_CS_Edge[0] = CS;
+	end
+//*****************串口数据时钟边沿获取
+	always @(posedge CLOCK_Digtal)	begin
+		Digtal_DATA_RD_Edge[1] = Digtal_DATA_RD_Edge[0];
+		Digtal_DATA_RD_Edge[0] = RD;
+	end	
+//*****************读写时钟计数
+	always @(posedge CLOCK_Digtal)	begin
+		if(CLK_Counter_W_EN == 1'B1)	begin				//写时钟计数
+			CLK_Counter_W = CLK_Counter_W + 1'B1;
+		end
+		else	begin
+			CLK_Counter_W = 7'D0;
+		end
+		if(CLK_Counter_R_EN == 1'B1)	begin				//读时钟计数
+			CLK_Counter_R = CLK_Counter_R + 1'B1;
+		end
+		else	begin
+			CLK_Counter_R = 7'D0;
+		end
+	end	
+//*****************接收数据
+	/*
+	*数据时钟上升沿     开始写入时钟计数
+	*数据时钟下降沿     停止写入时钟计数
+	* 写入时钟计数值为1		准备RAM需要写入的数据
+	* 写入时钟计数值为2		输出RAM写请求
+	* 写入时钟计数值为3-4	保持RAM写请求	
+	* 写入时钟计数值为5		清除RAM写请求
+	* 写入时钟计数值为6		准备RAM下次输出地址	
+	*/
+	/*
+	*CS上升沿，首先判断发送状态（INSERT还是READ）
+	*CS下降沿  更新状态(INSERT或READ)
+	* 读取时钟计数值为1		输出RAM读请求
+	* 读取时钟计数值为2--4	保持RAM读请求	读取RAM数据
+	* 读取时钟计数值为5		清除RAM读请求
+	* 读取时钟计数值为6		准备RAM下次读取地址	
+	*/
+	always @(posedge CLOCK_Digtal)	begin
+		//判断时钟计数器是否大于阈值，停止计数
+		if(CLK_Counter_W > Write_Delay)	begin
+			CLK_Counter_W_EN = 1'B0;
+		end
+		//数据时钟上升沿   开始写入时钟计数
+		if(Digtal_DATA_RD_Edge == 2'B01)	begin
+			CLK_Counter_W_EN = 1'B1;				//开启写入计数器，准备写入数据
+		end
+		//数据时钟下降沿   停止写入时钟计数
+		else if(Digtal_DATA_RD_Edge == 2'B10)	begin
+			CLK_Counter_W_EN = 1'B0;				//停止写入时钟计数
+		end
+		//根据写入时钟计数器值写入数据
+		else begin											
+			case(CLK_Counter_W)
+				8'D1:	begin			//准备RAM需要写入数据
+					//RAM_data_Reg = Digtal_DATA;
+				end
+				8'D2:	begin			//输出RAM写请求
+					RAM_wren_Reg = 1'B1;
+				end
+				8'D3:	begin			//保持RAM写请求
+					RAM_wren_Reg = 1'B1;
+				end
+				8'D4:	begin			//保持RAM写请求
+					RAM_wren_Reg = 1'B1;
+				end
+				8'D5:	begin			//清除RAM写请求
+					RAM_wren_Reg = 1'B0;
+				end
+				8'D6:	begin			//准备RAM下次写入地址
+					RAM_wraddress_Reg[31:0] = RAM_wraddress_Reg[31:0] + 1'B1;				//写入地址增加1							
+				end
+				8'D7:	begin
+					RAM_wren_Reg = 1'B0;																	//停止RAM写入时钟计数
+				end
+				default :	begin																			//防错  补全 case
+					RAM_wraddress_Reg[31:0] = RAM_wraddress_Reg[31:0];
+				end
+			endcase
+		end
+		if(Digtal_CS_Edge == 2'B01)	begin				//片选上升沿
+			if(SenddStatus[9] == 1'B1)	begin				//处于INSERT状态
+				if(SenddStatus[0] == 1'B1)				OUTPUT_data_Reg = Instert_Byte1;
+				else if(SenddStatus[1] == 1'B1)		OUTPUT_data_Reg = Instert_Byte2;
+				else if(SenddStatus[2] == 1'B1)		OUTPUT_data_Reg = Instert_Byte3;
+				else if(SenddStatus[3] == 1'B1)		OUTPUT_data_Reg = Instert_Byte4;
+				else if(SenddStatus[4] == 1'B1)		OUTPUT_data_Reg = Instert_Byte5;
+				else if(SenddStatus[5] == 1'B1)		OUTPUT_data_Reg = Instert_Byte6;
+				else if(SenddStatus[6] == 1'B1)		OUTPUT_data_Reg = Instert_Byte7;
+				else if(SenddStatus[7] == 1'B1)		OUTPUT_data_Reg = Instert_Byte8;
+			end
+			else if(SenddStatus[8] == 1'B1)	begin				//处于Read状态
+				CLK_Counter_R_EN = 1'B1;				//开启读取计数器，准备读取RAM数据
+			end
+		end
+		else if(Digtal_CS_Edge == 2'B11)	begin				//片选有效期间
+			case(CLK_Counter_R)										//选择读取计数时钟值
+				8'D1:	begin											//输出RAM读请求
+					RAM_rden_Reg = 1'B1;
+				end
+				8'D2:	begin											//保持RAM读请求
+					RAM_rden_Reg = 1'B1;
+				end
+				8'D3:	begin											//保持RAM读请求
+					RAM_rden_Reg = 1'B1;
+				end
+				8'D4:	begin											//保持RAM读请求  读取RAM数据
+					RAM_rden_Reg = 1'B1;
+					OUTPUT_data_Reg = RAM_Q;
+				end
+				8'D5:	begin											//清除RAM读请求
+					RAM_rden_Reg = 1'B0;
+				end
+				8'D6:	begin											//准备RAM下次读取地址	
+					CLK_Counter_R_EN = 1'B0;														//RAM读取时钟计数停止
+					RAM_rdaddress_Reg[31:0] = RAM_rdaddress_Reg[31:0] + 1'B1;			//RAM地址增加1
+				end
+				default:	begin											//防错  补全case default
+					RAM_rdaddress_Reg = RAM_rdaddress_Reg;
+				end
+			endcase
+		end
+		else if(Digtal_CS_Edge == 2'B10)	begin				//片选下降沿
+			if(SenddStatus[9] == 1'B1)	begin
+				if(SenddStatus[0] == 1'B1)	begin
+					SenddStatus = 10'B10_0000_0010;
+				end
+				else if(SenddStatus[1] == 1'B1)	begin
+					SenddStatus = 10'B10_0000_0100;
+				end
+				else if(SenddStatus[2] == 1'B1)	begin
+					SenddStatus = 10'B10_0000_1000;
+				end
+				else if(SenddStatus[3] == 1'B1)	begin			//发送完最后一个INSERT值 判断是否可以读取RAM数据
+					if(Instert_Length == 4)	begin
+						if((RAM_rdaddress_Reg + 1) <= RAM_wraddress_Reg)	begin
+							SenddStatus = 10'B01_0000_0000;
+						end
+						else begin
+							SenddStatus = 10'B10_0000_0001;
+						end
+					end
+					else	begin
+						SenddStatus = 10'B10_0001_0000;
+					end
+				end
+				else if(SenddStatus[4] == 1'B1)	begin			//发送完最后一个INSERT值 判断是否可以读取RAM数据
+					if(Instert_Length == 5)	begin
+						if(RAM_rdaddress_Reg + 1 <= RAM_wraddress_Reg)	begin
+							SenddStatus = 10'B01_0000_0000;
+						end
+						else begin
+							SenddStatus = 10'B10_0000_0001;
+						end
+					end
+					else	begin
+						SenddStatus = 10'B10_0010_0000;
+					end
+				end
+				else if(SenddStatus[5] == 1'B1)	begin			//发送完最后一个INSERT值 判断是否可以读取RAM数据
+					if(Instert_Length == 6)	begin
+						if(RAM_rdaddress_Reg + 1 <= RAM_wraddress_Reg)	begin
+							SenddStatus = 10'B01_0000_0000;
+						end
+						else begin
+							SenddStatus = 10'B10_0000_0001;
+						end
+					end
+					else	begin
+						SenddStatus = 10'B10_0100_0000;
+					end
+				end
+				else if(SenddStatus[6] == 1'B1)	begin			//发送完最后一个INSERT值 判断是否可以读取RAM数据
+					if(Instert_Length == 7)	begin
+						if(RAM_rdaddress_Reg + 1 <= RAM_wraddress_Reg)	begin
+							SenddStatus = 10'B01_0000_0000;
+						end
+						else begin
+							SenddStatus = 10'B10_0000_0001;
+						end
+					end
+					else	begin
+						SenddStatus = 10'B10_1000_0000;
+					end
+				end
+				else if(SenddStatus[7] == 1'B1)			begin			//发送完最后一个INSERT值 判断是否可以读取RAM数据
+					if(RAM_rdaddress_Reg + 1 <= RAM_wraddress_Reg)	begin
+						SenddStatus = 10'B01_0000_0000;
+					end
+					else begin
+						SenddStatus = 10'B10_0000_0001;
+					end
+				end
+			end
+			else if(SenddStatus[9] == 1'B0)	begin		//SenddStatus[8] == 1'B1  发送完一个Read数据，判断地址是否可能溢出，判断是否可以继续读取
+				if(RAM_rdaddress_Reg[31] == 1'B1 && RAM_wraddress_Reg[31] == 1'B1)		begin			//防止地址溢出
+					RAM_rdaddress_Reg[31] = 1'B0;
+					RAM_wraddress_Reg[31] = 1'B0;
+				end
+				if(RAM_rdaddress_Reg + 1 <= RAM_wraddress_Reg)	begin											//判断是否可以继续读取RAM数据
+					SenddStatus = 10'B01_0000_0000;
+				end
+				else begin
+					SenddStatus = 10'B10_0000_0001;
+				end
+			end
+		end
+		else begin			//片选无效期间，补全if else
+			CLK_Counter_R_EN = 1'B0;
+		end
+	end
+	
+//*****************端口输出
+	assign RAM_WREN = RAM_wren_Reg;														//RAM写请求
+	assign RAM_RDEN = RAM_rden_Reg;														//RAM读请求
+	assign RAM_Data_In = Rx_Data;															//RAM输入数据
+	assign RAM_RDADD = RAM_rdaddress_Reg[30:0];										//RAM读取地址
+	assign RAM_WRADD = RAM_wraddress_Reg[30:0];										//RAM写入地址
+	assign Out_Data = (CS == 1'B1)? OUTPUT_data_Reg : 8'HZZ;						//模块输出数据
+	
+endmodule

@@ -1,0 +1,47 @@
+m255
+K3
+13
+cModel Technology
+Z0 dD:\4_Idea\Altera\CycloneIV_Digtal\simulation\modelsim
+vDigtal_Main
+I:]Ul;hAlYn1i96aMEmQ>Y2
+VF45dHYT4_H<he<08i3?4n0
+Z1 dD:\4_Idea\Altera\CycloneIV_Digtal\simulation\modelsim
+w1555323735
+8D:/4_Idea/Altera/CycloneIV_Digtal/Source/Digtal_Main.v
+FD:/4_Idea/Altera/CycloneIV_Digtal/Source/Digtal_Main.v
+L0 1
+Z2 OV;L;10.1d;51
+r1
+31
+Z3 o-vlog01compat -work work -O0
+n@digtal_@main
+!i10b 1
+!s100 9Oh53`J=C9:XBOkKj`=o61
+!s85 0
+!s108 1555323804.240000
+!s107 D:/4_Idea/Altera/CycloneIV_Digtal/Source/Digtal_Main.v|
+!s90 -reportprogress|300|-vlog01compat|-work|work|+incdir+D:/4_Idea/Altera/CycloneIV_Digtal/Source|D:/4_Idea/Altera/CycloneIV_Digtal/Source/Digtal_Main.v|
+!s101 -O0
+!s92 -vlog01compat -work work +incdir+D:/4_Idea/Altera/CycloneIV_Digtal/Source -O0
+vDigtal_Main_vlg_tst
+!i10b 1
+!s100 2Xl]Y7aLe=HLz<3n4c5g^0
+I@d:DM3c8:DFHY7cHVf=5Z0
+V^4la4S1>bbTYoPoeZ[5dQ3
+R1
+w1555323327
+8D:/4_Idea/Altera/CycloneIV_Digtal/simulation/modelsim/Digtal_Main_vlg_tst.v
+FD:/4_Idea/Altera/CycloneIV_Digtal/simulation/modelsim/Digtal_Main_vlg_tst.v
+L0 2
+R2
+r1
+!s85 0
+31
+!s108 1555323804.587000
+!s107 D:/4_Idea/Altera/CycloneIV_Digtal/simulation/modelsim/Digtal_Main_vlg_tst.v|
+!s90 -reportprogress|300|-vlog01compat|-work|work|+incdir+D:/4_Idea/Altera/CycloneIV_Digtal/simulation/modelsim|D:/4_Idea/Altera/CycloneIV_Digtal/simulation/modelsim/Digtal_Main_vlg_tst.v|
+!s101 -O0
+R3
+!s92 -vlog01compat -work work +incdir+D:/4_Idea/Altera/CycloneIV_Digtal/simulation/modelsim -O0
+n@digtal_@main_vlg_tst

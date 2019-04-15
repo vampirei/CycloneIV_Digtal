@@ -1,0 +1,58 @@
+# Reading E:/SoftWave/altera/13.0/modelsim_ase/tcl/vsim/pref.tcl 
+# do CycloneIV_Digtal_run_msim_rtl_verilog.do 
+# if {[file exists rtl_work]} {
+# 	vdel -lib rtl_work -all
+# }
+# vlib rtl_work
+# vmap work rtl_work
+# Copying E:\SoftWave\altera\13.0\modelsim_ase\win32aloem/../modelsim.ini to modelsim.ini
+# Modifying modelsim.ini
+# ** Warning: Copied E:\SoftWave\altera\13.0\modelsim_ase\win32aloem/../modelsim.ini to modelsim.ini.
+#          Updated modelsim.ini.
+# 
+# vlog -vlog01compat -work work +incdir+D:/4_Idea/Altera/CycloneIV_Digtal/Source {D:/4_Idea/Altera/CycloneIV_Digtal/Source/Digtal_Main.v}
+# Model Technology ModelSim ALTERA vlog 10.1d Compiler 2012.11 Nov  2 2012
+# -- Compiling module Digtal_Main
+# ** Warning: D:/4_Idea/Altera/CycloneIV_Digtal/Source/Digtal_Main.v(18): (vlog-2608) Keyword "unsigned" not allowed here in Verilog 2001.
+# 
+# ** Warning: D:/4_Idea/Altera/CycloneIV_Digtal/Source/Digtal_Main.v(19): (vlog-2608) Keyword "unsigned" not allowed here in Verilog 2001.
+# 
+# ** Warning: D:/4_Idea/Altera/CycloneIV_Digtal/Source/Digtal_Main.v(30): (vlog-2608) Keyword "unsigned" not allowed here in Verilog 2001.
+# 
+# 
+# Top level modules:
+# 	Digtal_Main
+# 
+# vlog -vlog01compat -work work +incdir+D:/4_Idea/Altera/CycloneIV_Digtal/simulation/modelsim {D:/4_Idea/Altera/CycloneIV_Digtal/simulation/modelsim/Digtal_Main_vlg_tst.v}
+# Model Technology ModelSim ALTERA vlog 10.1d Compiler 2012.11 Nov  2 2012
+# -- Compiling module Digtal_Main_vlg_tst
+# 
+# Top level modules:
+# 	Digtal_Main_vlg_tst
+# 
+# vsim -t 1ps -L altera_ver -L lpm_ver -L sgate_ver -L altera_mf_ver -L altera_lnsim_ver -L cycloneive_ver -L rtl_work -L work -voptargs="+acc"  Digtal_Main_vlg_tst
+# vsim -L altera_ver -L lpm_ver -L sgate_ver -L altera_mf_ver -L altera_lnsim_ver -L cycloneive_ver -L rtl_work -L work -voptargs=\"+acc\" -t 1ps Digtal_Main_vlg_tst 
+# Loading work.Digtal_Main_vlg_tst
+# Loading work.Digtal_Main
+# 
+# add wave *
+# view structure
+# .main_pane.structure.interior.cs.body.struct
+# view signals
+# .main_pane.objects.interior.cs.body.tree
+# run -all
+# Running testbench
+add wave -position insertpoint  \
+sim:/Digtal_Main_vlg_tst/i1/CS \
+sim:/Digtal_Main_vlg_tst/i1/Out_Data \
+sim:/Digtal_Main_vlg_tst/i1/RD \
+sim:/Digtal_Main_vlg_tst/i1/Rx_Data \
+sim:/Digtal_Main_vlg_tst/i1/ByteModeStatus \
+sim:/Digtal_Main_vlg_tst/i1/ReceiveFrameHeaderStatus \
+sim:/Digtal_Main_vlg_tst/i1/ReceiveFrameStatus \
+sim:/Digtal_Main_vlg_tst/i1/EN_SendFrame \
+sim:/Digtal_Main_vlg_tst/i1/SendFrameHeaderStatus \
+sim:/Digtal_Main_vlg_tst/i1/SendFrameStatus
+restart
+run
+# Running testbench
